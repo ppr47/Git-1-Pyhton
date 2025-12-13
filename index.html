@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Ball - Dodge the Walls!</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <!-- Start Page -->
+    <div class="start-screen" id="startScreen">
+        <div class="title-container">
+            <h1 class="game-title">
+                <span class="title-flappy">FLAPPY</span>
+                <span class="title-snake">BALL</span>
+            </h1>
+            <p class="subtitle">Navigate through the burning city!</p>
+        </div>
+        <div class="instructions">
+            <div class="instruction-item">
+                <span class="key">SPACE</span>
+                <span class="action">or</span>
+                <span class="key">CLICK</span>
+                <span class="action">to start & flap</span>
+            </div>
+            <p style="margin-top: 20px; color: #FFA500; font-size: 16px; text-shadow: 0 0 10px rgba(255, 165, 0, 0.8);">
+                Tap anywhere to begin!
+            </p>
+        </div>
+        <button class="start-button" id="startButton">
+            <span class="button-glow"></span>
+            <span class="button-text">START GAME</span>
+        </button>
+    </div>
+
+    <!-- Game Container (Initially Hidden) -->
+    <div class="game-container hidden" id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+
+        <div class="ui-overlay">
+            <div class="score-display">
+                <div class="score-label">SCORE</div>
+                <div class="score-value" id="scoreValue">0</div>
+            </div>
+
+            <div class="high-score-display">
+                <div class="high-score-label">BEST</div>
+                <div class="high-score-value" id="highScoreValue">0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Page (Initially Hidden) -->
+    <div class="game-over-screen hidden" id="gameOverScreen">
+        <div class="game-over-content">
+            <h2 class="game-over-title">GAME OVER</h2>
+            <div style="text-align: center; margin: 30px 0;">
+                <img src="gameover.jpg" alt="Game Over"
+                    style="width: 250px; height: 250px; object-fit: cover; border-radius: 12px; border: 4px solid #ff4444; box-shadow: 0 0 40px rgba(255, 68, 68, 0.5);">
+            </div>
+            <div class="final-score-container">
+                <p class="final-score-label">Your Score</p>
+                <p class="final-score" id="finalScore">0</p>
+            </div>
+            <div class="result-message" id="resultMessage"></div>
+            <button class="restart-button" id="restartButton">
+                <span class="button-glow"></span>
+                <span class="button-text">TRY AGAIN</span>
+            </button>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+
+</html>
