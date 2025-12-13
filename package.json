@@ -1,0 +1,13 @@
+{
+  "name": "flappy-snake",
+  "version": "1.0.0",
+  "description": "Flappy Bird game with snake character dodging buildings in a fiery city",
+  "main": "server.js",
+  "scripts": {
+    "start": "bun server.js",
+    "dev": "bun server.js"
+  },
+  "keywords": ["game", "flappy-bird", "snake", "bun"],
+  "author": "",
+  "license": "MIT"
+}
