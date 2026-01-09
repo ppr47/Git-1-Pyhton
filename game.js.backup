@@ -1,0 +1,458 @@
+// Game Configuration
+const CONFIG = {
+    gravity: 0.6,
+    jumpForce: -9,
+    gameSpeed: 3,
+    buildingGap: 200,
+    buildingSpacing: 300,
+    minBuildingHeight: 100,
+    maxBuildingHeight: 400,
+};
+
+// Game State
+const gameState = {
+    isPlaying: false,
+    score: 0,
+    highScore: localStorage.getItem('flappySnakeHighScore') || 0,
+    frames: 0,
+};
+
+// Canvas Setup
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
+}
+
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Snake Object
+const snake = {
+    x: 150,
+    y: 300,
+    width: 50,
+    height: 30,
+    velocity: 0,
+    rotation: 0,
+    color: '#32CD32',
+
+    draw() {
+        ctx.save();
+        ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+        ctx.rotate(this.rotation);
+
+        // Snake body segments
+        const segmentWidth = 15;
+        const segments = 3;
+
+        for (let i = 0; i < segments; i++) {
+            const offsetX = -this.width / 2 + (i * segmentWidth);
+            const scale = 1 - (i * 0.1);
+            const segmentHeight = this.height * scale;
+
+            // Outer shadow
+            ctx.shadowColor = 'rgba(0, 255, 0, 0.5)';
+            ctx.shadowBlur = 10;
+
+            // Gradient fill
+            const gradient = ctx.createLinearGradient(0, -segmentHeight / 2, 0, segmentHeight / 2);
+            gradient.addColorStop(0, '#98FB98');
+            gradient.addColorStop(0.5, '#32CD32');
+            gradient.addColorStop(1, '#228B22');
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.ellipse(offsetX, 0, segmentWidth / 2, segmentHeight / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Scale pattern
+            ctx.fillStyle = 'rgba(0, 100, 0, 0.3)';
+            ctx.beginPath();
+            ctx.ellipse(offsetX - 2, -2, segmentWidth / 4, segmentHeight / 4, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Snake head (front)
+        ctx.shadowBlur = 15;
+        const headGradient = ctx.createLinearGradient(0, -this.height / 2, 0, this.height / 2);
+        headGradient.addColorStop(0, '#98FB98');
+        headGradient.addColorStop(0.5, '#32CD32');
+        headGradient.addColorStop(1, '#228B22');
+
+        ctx.fillStyle = headGradient;
+        ctx.beginPath();
+        ctx.ellipse(this.width / 2 - 10, 0, 12, this.height / 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Eyes
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#FFD700';
+        ctx.beginPath();
+        ctx.arc(this.width / 2 - 5, -6, 4, 0, Math.PI * 2);
+        ctx.arc(this.width / 2 - 5, 6, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Pupils
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.arc(this.width / 2 - 4, -6, 2, 0, Math.PI * 2);
+        ctx.arc(this.width / 2 - 4, 6, 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    },
+
+    update() {
+        this.velocity += CONFIG.gravity;
+        this.y += this.velocity;
+
+        // Update rotation based on velocity
+        this.rotation = Math.min(Math.max(this.velocity * 0.05, -0.5), 0.5);
+
+        // Boundary check
+        if (this.y + this.height > canvas.height || this.y < 0) {
+            gameOver();
+        }
+    },
+
+    jump() {
+        this.velocity = CONFIG.jumpForce;
+    },
+
+    reset() {
+        this.y = canvas.height / 2;
+        this.velocity = 0;
+        this.rotation = 0;
+    }
+};
+
+// Building Object
+class Building {
+    constructor(x) {
+        this.x = x;
+        this.width = 80;
+
+        const minHeight = CONFIG.minBuildingHeight;
+        const maxHeight = canvas.height - CONFIG.buildingGap - CONFIG.minBuildingHeight;
+
+        this.topHeight = Math.random() * (maxHeight - minHeight) + minHeight;
+        this.bottomY = this.topHeight + CONFIG.buildingGap;
+        this.bottomHeight = canvas.height - this.bottomY;
+
+        this.passed = false;
+        this.windowSize = 8;
+        this.windowSpacing = 15;
+    }
+
+    draw() {
+        // Top Building
+        this.drawBuilding(this.x, 0, this.width, this.topHeight);
+
+        // Bottom Building
+        this.drawBuilding(this.x, this.bottomY, this.width, this.bottomHeight);
+    }
+
+    drawBuilding(x, y, width, height) {
+        // Building gradient
+        const gradient = ctx.createLinearGradient(x, y, x + width, y + height);
+        gradient.addColorStop(0, '#2C2C2C');
+        gradient.addColorStop(0.5, '#1A1A1A');
+        gradient.addColorStop(1, '#0D0D0D');
+
+        // Building shadow
+        ctx.shadowColor = 'rgba(255, 69, 0, 0.5)';
+        ctx.shadowBlur = 20;
+
+        // Main building body
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, y, width, height);
+
+        // Building outline
+        ctx.strokeStyle = '#FF4500';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, width, height);
+
+        // Windows
+        ctx.shadowBlur = 5;
+        const cols = Math.floor(width / this.windowSpacing);
+        const rows = Math.floor(height / this.windowSpacing);
+
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                const wx = x + col * this.windowSpacing + 8;
+                const wy = y + row * this.windowSpacing + 8;
+
+                // Random lit windows
+                const isLit = Math.random() > 0.5;
+                ctx.fillStyle = isLit ? '#FFA500' : '#333333';
+                ctx.shadowColor = isLit ? '#FF8C00' : 'transparent';
+                ctx.fillRect(wx, wy, this.windowSize, this.windowSize);
+            }
+        }
+
+        // Antenna on top buildings
+        if (y === 0 && Math.random() > 0.5) {
+            ctx.shadowBlur = 10;
+            ctx.strokeStyle = '#FF4500';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(x + width / 2, y + height);
+            ctx.lineTo(x + width / 2, y + height - 30);
+            ctx.stroke();
+
+            // Antenna light
+            ctx.fillStyle = '#FF0000';
+            ctx.shadowColor = '#FF0000';
+            ctx.shadowBlur = 15;
+            ctx.beginPath();
+            ctx.arc(x + width / 2, y + height - 30, 4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    update() {
+        this.x -= CONFIG.gameSpeed;
+    }
+
+    isOffScreen() {
+        return this.x + this.width < 0;
+    }
+
+    collidesWith(snake) {
+        const snakeLeft = snake.x;
+        const snakeRight = snake.x + snake.width;
+        const snakeTop = snake.y;
+        const snakeBottom = snake.y + snake.height;
+
+        const buildingLeft = this.x;
+        const buildingRight = this.x + this.width;
+
+        if (snakeRight > buildingLeft && snakeLeft < buildingRight) {
+            if (snakeTop < this.topHeight || snakeBottom > this.bottomY) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+// Buildings Array
+const buildings = [];
+
+function spawnBuilding() {
+    const lastBuilding = buildings[buildings.length - 1];
+    const x = lastBuilding ? lastBuilding.x + CONFIG.buildingSpacing : canvas.width;
+    buildings.push(new Building(x));
+}
+
+// Particle System for Fire Effects
+class FireParticle {
+    constructor() {
+        this.reset();
+    }
+
+    reset() {
+        this.x = Math.random() * canvas.width;
+        this.y = canvas.height + Math.random() * 100;
+        this.size = Math.random() * 4 + 2;
+        this.speedY = Math.random() * 3 + 1;
+        this.speedX = (Math.random() - 0.5) * 2;
+        this.life = 1;
+        this.decay = Math.random() * 0.01 + 0.005;
+    }
+
+    update() {
+        this.y -= this.speedY;
+        this.x += this.speedX;
+        this.life -= this.decay;
+
+        if (this.life <= 0 || this.y < 0) {
+            this.reset();
+        }
+    }
+
+    draw() {
+        ctx.save();
+        ctx.globalAlpha = this.life;
+
+        const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
+        gradient.addColorStop(0, '#FFFF00');
+        gradient.addColorStop(0.5, '#FF8C00');
+        gradient.addColorStop(1, '#FF4500');
+
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+}
+
+const fireParticles = Array.from({ length: 100 }, () => new FireParticle());
+
+// Background Drawing
+function drawBackground() {
+    // Dark fire gradient
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#1a0000');
+    gradient.addColorStop(0.5, '#330000');
+    gradient.addColorStop(1, '#4d0000');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Fire particles
+    fireParticles.forEach(particle => {
+        particle.update();
+        particle.draw();
+    });
+}
+
+// Game Loop
+function gameLoop() {
+    // Draw background
+    drawBackground();
+
+    if (gameState.isPlaying) {
+        // Update snake
+        snake.update();
+
+        // Update and draw buildings
+        buildings.forEach((building, index) => {
+            building.update();
+            building.draw();
+
+            // Check collision
+            if (building.collidesWith(snake)) {
+                gameOver();
+            }
+
+            // Score when passing building
+            if (!building.passed && snake.x > building.x + building.width) {
+                building.passed = true;
+                gameState.score++;
+                updateScore();
+            }
+
+            // Remove off-screen buildings
+            if (building.isOffScreen()) {
+                buildings.splice(index, 1);
+            }
+        });
+
+        // Spawn new buildings
+        if (buildings.length === 0 || buildings[buildings.length - 1].x < canvas.width - CONFIG.buildingSpacing) {
+            spawnBuilding();
+        }
+
+        gameState.frames++;
+    } else {
+        // Draw idle buildings
+        buildings.forEach(building => building.draw());
+    }
+
+    // Always draw snake
+    snake.draw();
+
+    requestAnimationFrame(gameLoop);
+}
+
+// Input Handling
+function handleJump() {
+    // Auto-start game on first interaction if not playing
+    if (!gameState.isPlaying) {
+        const startScreen = document.getElementById('startScreen');
+        if (!startScreen.classList.contains('hidden')) {
+            startGame();
+        }
+    }
+
+    if (gameState.isPlaying) {
+        snake.jump();
+    }
+}
+
+canvas.addEventListener('click', handleJump);
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') {
+        e.preventDefault();
+        handleJump();
+    }
+});
+
+// UI Functions
+function updateScore() {
+    document.getElementById('scoreValue').textContent = gameState.score;
+}
+
+function updateHighScore() {
+    document.getElementById('highScoreValue').textContent = gameState.highScore;
+}
+
+function startGame() {
+    // Reset game state
+    gameState.isPlaying = true;
+    gameState.score = 0;
+    gameState.frames = 0;
+
+    // Reset snake
+    snake.reset();
+
+    // Clear buildings
+    buildings.length = 0;
+    spawnBuilding();
+
+    // Update UI
+    updateScore();
+    document.getElementById('startScreen').classList.add('hidden');
+    document.getElementById('gameOverScreen').classList.add('hidden');
+}
+
+function gameOver() {
+    if (!gameState.isPlaying) return;
+
+    gameState.isPlaying = false;
+
+    // Update high score
+    if (gameState.score > gameState.highScore) {
+        gameState.highScore = gameState.score;
+        localStorage.setItem('flappySnakeHighScore', gameState.highScore);
+        updateHighScore();
+    }
+
+    // Show game over screen
+    document.getElementById('finalScore').textContent = gameState.score;
+
+    const resultMessage = document.getElementById('resultMessage');
+    if (gameState.score > gameState.highScore - 1) {
+        resultMessage.textContent = '🏆 NEW HIGH SCORE! 🏆';
+        resultMessage.style.color = '#FFD700';
+    } else if (gameState.score > 20) {
+        resultMessage.textContent = '🔥 AMAZING! 🔥';
+        resultMessage.style.color = '#FF4500';
+    } else if (gameState.score > 10) {
+        resultMessage.textContent = '👍 GOOD JOB! 👍';
+        resultMessage.style.color = '#FFA500';
+    } else {
+        resultMessage.textContent = 'Keep practicing!';
+        resultMessage.style.color = '#FF8C00';
+    }
+
+    setTimeout(() => {
+        document.getElementById('gameOverScreen').classList.remove('hidden');
+    }, 500);
+}
+
+// Event Listeners
+document.getElementById('startButton').addEventListener('click', startGame);
+document.getElementById('restartButton').addEventListener('click', startGame);
+
+// Initialize
+updateHighScore();
+spawnBuilding();
+gameLoop();
