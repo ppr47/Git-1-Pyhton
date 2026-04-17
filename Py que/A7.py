@@ -1,5 +1,0 @@
-a=int(input("Enter a number:"))
-b=float(input("Enter another number:"))
-print("Class of a",type(a))
-print("Class of b",type(b))
-print(a+b)
